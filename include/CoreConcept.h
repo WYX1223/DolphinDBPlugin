@@ -282,12 +282,9 @@ private:
 	unsigned char uuid_[16];
 };
 
-namespace std {
-
-template<>
-struct hash<Guid> {
-	inline size_t operator()(const Guid& val) const{
-		const unsigned char* key = val.bytes();
+struct GuidHash {
+	inline uint64_t operator()(const Guid& guid) const {
+		const unsigned char* key = guid.bytes();
 		const uint32_t m = 0x5bd1e995;
 		const int r = 24;
 		uint32_t h = 16;
@@ -332,10 +329,6 @@ struct hash<Guid> {
 		return h;
 	}
 };
-
-};
-
-typedef std::hash<Guid> GuidHash;
 
 template<class T>
 class Array{
@@ -634,6 +627,9 @@ public:
 	virtual void collectUserDefinedFunctions(unordered_map<string,FunctionDef*>& functionDefs) const {}
 	virtual void collectVariables(vector<int>& vars, int minIndex, int maxIndex) const {}
 	virtual bool isLargeConstant() const {return false;}
+	virtual InferredType inferType(Heap* heap, unordered_set<void*> & vis, Statement* enclosingStmt)  {
+		throw RuntimeException("inferType not implemented");
+	}
 };
 
 class Constant: public Object{
@@ -645,6 +641,8 @@ public:
 	Constant() : flag_(3){}
 	Constant(unsigned short flag) :  flag_(flag){}
 	virtual ~Constant(){}
+	//virtual InferredType inferType(Heap* heap, unordered_set<ControlFlowEdge> & vis, vector<StatementSP> & fromCFGNodes, void * edgeStartNode) { return InferredType(getForm(), getType(), getCategory()); }
+	virtual InferredType inferType(Heap* heap, unordered_set<void*> & vis, Statement* enclosingStmt) { return InferredType(getForm(), getType(), getCategory()); }
 	inline bool isTemporary() const {return flag_ & 1;}
 	inline void setTemporary(bool val){ if(val) flag_ |= 1; else flag_ &= ~1;}
 	inline bool isIndependent() const {return flag_ & 2;}
@@ -1295,8 +1293,6 @@ public:
 	inline void setView(bool option) {if(option) flag_ |= 16; else flag_ &= ~16;}
 	inline bool isInternal() const { return flag_ & 32;}
 	inline void setInternal(bool option) {if(option) flag_ |= 32; else flag_ &= ~32;}
-	inline bool isJIT() const { return flag_ & 128;}
-	inline void setJIT(bool option) {if(option) flag_ |= 128; else flag_ &= ~128;}
 	inline bool variableParamNum() const {	return minParamNum_<maxParamNum_;}
 	inline int getMaxParamCount() const { return maxParamNum_;}
 	inline int getMinParamCount() const {	return minParamNum_;}
@@ -1428,6 +1424,11 @@ public:
 	virtual bool isPrimitiveOperator() const = 0;
 	virtual IO_ERR serialize(Heap* pHeap, const ByteArrayCodeBufferSP& buffer) const = 0;
 	virtual void collectUserDefinedFunctions(unordered_map<string,FunctionDef*>& functionDefs) const = 0;
+	virtual InferredType inferType(Heap *heap, unordered_set<void*> &vis,
+									Statement *enclosingStmt,
+									const ConstantSP &a,
+									const ConstantSP &b)
+	{ return InferredType(); }
 
   private:
 	int priority_;
